@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>银华货币基金收益监测看板</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; 
+            background: #f5f7fa; 
+            padding: 20px; 
+        }
+        .dashboard { max-width: 1400px; margin: 0 auto; }
+        .header { 
+            background: linear-gradient(135deg, #1a3a5c 0%, #2d5a87 100%); 
+            color: white; 
+            padding: 24px 32px; 
+            border-radius: 12px; 
+            margin-bottom: 24px; 
+            box-shadow: 0 4px 16px rgba(26, 58, 92, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .header-content { flex: 1; }
+        .header h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+        .header .subtitle { font-size: 14px; opacity: 0.85; }
+        .refresh-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            backdrop-filter: blur(4px);
+        }
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+        }
+        .refresh-btn:active {
+            transform: translateY(0);
+        }
+        .refresh-btn.spinning .refresh-icon {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .refresh-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.6);
+            border-top-color: white;
+            border-radius: 50%;
+        }
+        .refresh-btn.spinning .refresh-icon {
+            border-top-color: white;
+        }
+        .card { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 24px; 
+            margin-bottom: 24px; 
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06); 
+        }
+        .card-title { 
+            font-size: 18px; 
+            font-weight: 600; 
+            color: #1a3a5c; 
+            margin-bottom: 16px; 
+            padding-bottom: 12px; 
+            border-bottom: 2px solid #e8ecf1; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-title .tag { 
+            display: inline-block; 
+            background: #e3f2fd; 
+            color: #1976d2; 
+            font-size: 12px; 
+            padding: 2px 8px; 
+            border-radius: 4px; 
+            margin-left: 8px; 
+            font-weight: 500; 
+        }
+        .chart-container { width: 100%; height: 420px; }
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 16px; 
+            margin-bottom: 20px; 
+        }
+        .stat-item { 
+            background: #f8fafc; 
+            border-radius: 8px; 
+            padding: 16px; 
+            text-align: center; 
+            border-left: 4px solid #2d5a87; 
+        }
+        .stat-item.warning { border-left-color: #ff9800; }
+        .stat-item.danger { border-left-color: #f44336; }
+        .stat-item.info { border-left-color: #1976d2; }
+        .stat-item.purple { border-left-color: #7b1fa2; }
+        .stat-label { font-size: 13px; color: #666; margin-bottom: 6px; }
+        .stat-value { font-size: 24px; font-weight: 700; color: #1a3a5c; }
+        .stat-value.warning { color: #ff9800; }
+        .stat-value.danger { color: #f44336; }
+        .stat-value.info { color: #1976d2; }
+        .stat-value.purple { color: #7b1fa2; }
+        .stat-desc { font-size: 12px; color: #999; margin-top: 4px; }
+        .summary-box { 
+            background: #f8fafc; 
+            border-radius: 8px; 
+            padding: 16px 20px; 
+            margin-top: 16px; 
+            border-left: 4px solid #2d5a87; 
+        }
+        .summary-box p { margin: 4px 0; font-size: 14px; color: #444; }
+        .summary-box strong { color: #1a3a5c; }
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success { background: #4caf50; }
+        .toast.error { background: #f44336; }
+        .toast.info { background: #2196f3; }
+        .loading-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            backdrop-filter: blur(2px);
+        }
+        .loading-overlay.show { display: flex; }
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e3f2fd;
+            border-top-color: #1976d2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+    </div>
+    <div class="toast" id="toast"></div>
+    
+    <div class="dashboard">
+        <div class="header">
+            <div class="header-content">
+                <h1>银华货币基金收益监测看板</h1>
+                <div class="subtitle" id="dataDate">数据日期：加载中... | 监测基金：银华货币A (180008) + 银华惠添益A (001101)</div>
+            </div>
+            <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">
+                <span class="refresh-icon"></span>
+                <span>刷新数据</span>
+            </button>
+        </div>
+
+        <!-- 板块1：近1月七日年化收益率趋势 -->
+        <div class="card">
+            <div class="card-title">
+                <span>板块1：近1月每日T-1日七日年化收益率趋势<span class="tag">0.9% 阈值监测</span></span>
+            </div>
+            <div class="stats-grid" id="section1Stats">
+                <!-- 动态填充 -->
+            </div>
+            <div id="trendChart" class="chart-container"></div>
+            <div class="summary-box" id="section1Summary">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 板块2：当日收益率排名 -->
+        <div class="card">
+            <div class="card-title">
+                <span>板块2：T-1日七日年化收益率在余额宝/零钱通上线基金中的排名（共85只）<span class="tag" id="section2Tag">2026-06-24</span></span>
+            </div>
+            <div class="stats-grid" id="section2Stats">
+                <!-- 动态填充 -->
+            </div>
+            <div id="rankChart" class="chart-container" style="height: 360px;"></div>
+            <div class="summary-box" id="section2Summary">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+
+        <!-- 板块3：费前七日年化收益率排名 -->
+        <div class="card">
+            <div class="card-title">
+                <span>板块3：T-1日费前七日年化收益率在余额宝/零钱通上线基金中的排名（共85只）<span class="tag">费前口径</span></span>
+            </div>
+            <div class="stats-grid" id="section3Stats">
+                <!-- 动态填充 -->
+            </div>
+            <div id="preFeeRankChart" class="chart-container" style="height: 360px;"></div>
+            <div class="summary-box" id="section3Summary">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局数据存储
+        let dashboardData = null;
+        let trendChart = null;
+        let rankChart = null;
+        let preFeeRankChart = null;
+
+        // 显示Toast消息
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // 显示/隐藏加载动画
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').classList.toggle('show', show);
+        }
+
+        // 刷新按钮动画
+        function setRefreshSpinning(spinning) {
+            const btn = document.getElementById('refreshBtn');
+            btn.classList.toggle('spinning', spinning);
+            btn.disabled = spinning;
+        }
+
+        // 从后端加载数据
+        async function loadData() {
+            try {
+                const response = await fetch('/data_store.json');
+                if (!response.ok) throw new Error('加载数据失败');
+                dashboardData = await response.json();
+                updateDashboard();
+                return true;
+            } catch (e) {
+                console.error('加载数据失败:', e);
+                showToast('数据加载失败，请刷新重试', 'error');
+                return false;
+            }
+        }
+
+        // 刷新数据（静态部署版本：从 data_store.json 重新加载）
+        async function refreshData() {
+            setRefreshSpinning(true);
+            showLoading(true);
+            
+            try {
+                const response = await fetch('./data_store.json?' + new Date().getTime(), { method: 'GET' });
+                if (response.ok) {
+                    const result = await response.json();
+                    dashboardData = result;
+                    updateDashboard();
+                    showToast('数据已刷新！', 'success');
+                } else {
+                    showToast('加载数据失败', 'error');
+                }
+            } catch (e) {
+                console.error('刷新失败:', e);
+                showToast('刷新失败，请检查网络连接', 'error');
+            } finally {
+                setRefreshSpinning(false);
+                showLoading(false);
+            }
+        }
+
+        // 更新整个看板
+        function updateDashboard() {
+            if (!dashboardData) return;
+            
+            // 更新日期
+            document.getElementById('dataDate').textContent = 
+                `数据日期：${dashboardData.date} | 监测基金：银华货币A (180008) + 银华惠添益A (001101)`;
+            document.getElementById('section2Tag').textContent = dashboardData.date;
+            
+            // 更新各板块
+            updateSection1();
+            updateSection2();
+            updateSection3();
+            
+            // 更新图表
+            updateTrendChart();
+            updateRankChart();
+            updatePreFeeRankChart();
+        }
+
+        // 板块1：趋势统计卡片
+        function updateSection1() {
+            const f1 = dashboardData.funds['180008'];
+            const f2 = dashboardData.funds['001101'];
+            const r1 = dashboardData.rank_data['银华货币A'];
+            const r2 = dashboardData.rank_data['银华惠添益A'];
+            
+            const latestRate1 = f1.latest_rate;
+            const latestRate2 = f2.latest_rate;
+            const below1 = r1['低于0.9天数'];
+            const below2 = r2['低于0.9天数'];
+            
+            const html = `
+                <div class="stat-item danger">
+                    <div class="stat-label">银华货币A 前一日收益率</div>
+                    <div class="stat-value danger">${latestRate1.toFixed(3)}%</div>
+                    <div class="stat-desc">${latestRate1 < 0.9 ? '低于0.900%阈值' : '高于0.900%阈值'}</div>
+                </div>
+                <div class="stat-item danger">
+                    <div class="stat-label">银华货币A 低于0.900%天数</div>
+                    <div class="stat-value danger">${below1}天</div>
+                    <div class="stat-desc">近${f1.history.length}个交易日</div>
+                </div>
+                <div class="stat-item warning">
+                    <div class="stat-label">银华惠添益A 前一日收益率</div>
+                    <div class="stat-value warning">${latestRate2.toFixed(3)}%</div>
+                    <div class="stat-desc">${latestRate2 < 0.9 ? '低于0.900%阈值' : '高于0.900%阈值'}</div>
+                </div>
+                <div class="stat-item warning">
+                    <div class="stat-label">银华惠添益A 低于0.900%天数</div>
+                    <div class="stat-value warning">${below2}天</div>
+                    <div class="stat-desc">近${f2.history.length}个交易日（最新${latestRate2.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item info">
+                    <div class="stat-label">银华货币A 余额宝排名</div>
+                    <div class="stat-value info">${r1['余额宝排名'].rank} / ${r1['余额宝排名'].total}</div>
+                    <div class="stat-desc">${getPercentile(r1['余额宝排名'].rank, r1['余额宝排名'].total)}（七日年化${r1['余额宝排名'].rate.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item info">
+                    <div class="stat-label">银华货币A 余额宝费前排名</div>
+                    <div class="stat-value info">${dashboardData.pre_fee_rank_data['银华货币A']['余额宝排名'].rank} / ${dashboardData.pre_fee_rank_data['银华货币A']['余额宝排名'].total}</div>
+                    <div class="stat-desc">${getPercentile(dashboardData.pre_fee_rank_data['银华货币A']['余额宝排名'].rank, dashboardData.pre_fee_rank_data['银华货币A']['余额宝排名'].total)}（费前${dashboardData.pre_fee_rank_data['银华货币A']['余额宝排名'].rate.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item purple">
+                    <div class="stat-label">银华惠添益A 零钱通排名</div>
+                    <div class="stat-value purple">${r2['零钱通排名'].rank} / ${r2['零钱通排名'].total}</div>
+                    <div class="stat-desc">${getPercentile(r2['零钱通排名'].rank, r2['零钱通排名'].total)}（七日年化${r2['零钱通排名'].rate.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item purple">
+                    <div class="stat-label">银华惠添益A 零钱通费前排名</div>
+                    <div class="stat-value purple">${dashboardData.pre_fee_rank_data['银华惠添益A']['零钱通排名'].rank} / ${dashboardData.pre_fee_rank_data['银华惠添益A']['零钱通排名'].total}</div>
+                    <div class="stat-desc">${getPercentile(dashboardData.pre_fee_rank_data['银华惠添益A']['零钱通排名'].rank, dashboardData.pre_fee_rank_data['银华惠添益A']['零钱通排名'].total)}（费前${dashboardData.pre_fee_rank_data['银华惠添益A']['零钱通排名'].rate.toFixed(3)}%）</div>
+                </div>
+            `;
+            document.getElementById('section1Stats').innerHTML = html;
+            
+            // 更新摘要
+            const summary1 = `近1月T-1日收益率呈现明显${latestRate1 < 0.9 ? '下行' : '波动'}趋势，最新为${latestRate1.toFixed(3)}%。在余额宝50只基金中，七日年化排名<strong>${r1['余额宝排名'].rank}/${r1['余额宝排名'].total}</strong>，费前排名<strong>${dashboardData.pre_fee_rank_data['银华货币A']['余额宝排名'].rank}/${dashboardData.pre_fee_rank_data['银华货币A']['余额宝排名'].total}</strong>。`;
+            const summary2 = `近1月T-1日收益率最新为${latestRate2.toFixed(3)}%。在零钱通上线35只基金中，七日年化排名<strong>${r2['零钱通排名'].rank}/${r2['零钱通排名'].total}</strong>，费前排名<strong>${dashboardData.pre_fee_rank_data['银华惠添益A']['零钱通排名'].rank}/${dashboardData.pre_fee_rank_data['银华惠添益A']['零钱通排名'].total}</strong>。`;
+            document.getElementById('section1Summary').innerHTML = `
+                <p><strong>银华货币A (180008)：</strong>${summary1}</p>
+                <p><strong>银华惠添益A (001101)：</strong>${summary2}</p>
+            `;
+        }
+
+        // 板块2：排名统计
+        function updateSection2() {
+            const r1 = dashboardData.rank_data['银华货币A'];
+            const r2 = dashboardData.rank_data['银华惠添益A'];
+            const avg = dashboardData.rank_data['平均收益'];
+            
+            const html = `
+                <div class="stat-item danger">
+                    <div class="stat-label">银华货币A 排名（85只）</div>
+                    <div class="stat-value danger">${r1['合并排名'].rank} / ${r1['合并排名'].total}</div>
+                    <div class="stat-desc">余额宝50只中排${r1['余额宝排名'].rank}，零钱通35只均高于</div>
+                </div>
+                <div class="stat-item warning">
+                    <div class="stat-label">银华惠添益A 排名（85只）</div>
+                    <div class="stat-value warning">${r2['合并排名'].rank} / ${r2['合并排名'].total}</div>
+                    <div class="stat-desc">零钱通35只中排${r2['零钱通排名'].rank}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">余额宝基金平均收益</div>
+                    <div class="stat-value">${avg['余额宝'].toFixed(3)}%</div>
+                    <div class="stat-desc">50只基金</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">零钱通基金平均收益</div>
+                    <div class="stat-value">${avg['零钱通'].toFixed(3)}%</div>
+                    <div class="stat-desc">35只上线基金</div>
+                </div>
+            `;
+            document.getElementById('section2Stats').innerHTML = html;
+            
+            document.getElementById('section2Summary').innerHTML = `
+                <p><strong>银华货币A (180008)：</strong>在余额宝/零钱通上线合并池85只基金中排名<strong>第${r1['合并排名'].rank}位</strong>（${getPercentile(r1['合并排名'].rank, r1['合并排名'].total)}），收益率${r1['合并排名'].rate.toFixed(3)}%。</p>
+                <p><strong>银华惠添益A (001101)：</strong>在余额宝/零钱通上线合并池85只基金中排名<strong>第${r2['合并排名'].rank}位</strong>（${getPercentile(r2['合并排名'].rank, r2['合并排名'].total)}），收益率${r2['合并排名'].rate.toFixed(3)}%。在零钱通上线35只中排名<strong>第${r2['零钱通排名'].rank}位</strong>（${getPercentile(r2['零钱通排名'].rank, r2['零钱通排名'].total)}）。</p>
+            `;
+        }
+
+        // 板块3：费前排名统计
+        function updateSection3() {
+            const p1 = dashboardData.pre_fee_rank_data['银华货币A'];
+            const p2 = dashboardData.pre_fee_rank_data['银华惠添益A'];
+            const avg = dashboardData.pre_fee_rank_data['平均收益'];
+            
+            const html = `
+                <div class="stat-item danger">
+                    <div class="stat-label">银华货币A 费前排名（85只）</div>
+                    <div class="stat-value danger">${p1['合并排名'].rank} / ${p1['合并排名'].total}</div>
+                    <div class="stat-desc">费前${p1['合并排名'].rate.toFixed(3)}%</div>
+                </div>
+                <div class="stat-item danger">
+                    <div class="stat-label">银华货币A 余额宝费前排名</div>
+                    <div class="stat-value danger">${p1['余额宝排名'].rank} / ${p1['余额宝排名'].total}</div>
+                    <div class="stat-desc">${getPercentile(p1['余额宝排名'].rank, p1['余额宝排名'].total)}（费前${p1['余额宝排名'].rate.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item warning">
+                    <div class="stat-label">银华惠添益A 费前排名（85只）</div>
+                    <div class="stat-value warning">${p2['合并排名'].rank} / ${p2['合并排名'].total}</div>
+                    <div class="stat-desc">费前${p2['合并排名'].rate.toFixed(3)}%</div>
+                </div>
+                <div class="stat-item warning">
+                    <div class="stat-label">银华惠添益A 零钱通费前排名</div>
+                    <div class="stat-value warning">${p2['零钱通排名'].rank} / ${p2['零钱通排名'].total}</div>
+                    <div class="stat-desc">${getPercentile(p2['零钱通排名'].rank, p2['零钱通排名'].total)}（费前${p2['零钱通排名'].rate.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">余额宝费前平均收益</div>
+                    <div class="stat-value">${avg['余额宝'].toFixed(3)}%</div>
+                    <div class="stat-desc">50只基金</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">零钱通费前平均收益</div>
+                    <div class="stat-value">${avg['零钱通'].toFixed(3)}%</div>
+                    <div class="stat-desc">35只上线基金</div>
+                </div>
+            `;
+            document.getElementById('section3Stats').innerHTML = html;
+            
+            document.getElementById('section3Summary').innerHTML = `
+                <p><strong>费前七日年化收益率计算：</strong>当日七日年化收益率 + 管理费率 + 托管费率 + 销售服务费率</p>
+                <p><strong>银华货币A (180008)：</strong>费前${p1['合并排名'].rate.toFixed(3)}%。在85只合并池中排名<strong>第${p1['合并排名'].rank}位</strong>（${getPercentile(p1['合并排名'].rank, p1['合并排名'].total)}）；在余额宝50只中排名<strong>第${p1['余额宝排名'].rank}位</strong>（${getPercentile(p1['余额宝排名'].rank, p1['余额宝排名'].total)}）。</p>
+                <p><strong>银华惠添益A (001101)：</strong>费前${p2['合并排名'].rate.toFixed(3)}%。在85只合并池中排名<strong>第${p2['合并排名'].rank}位</strong>（${getPercentile(p2['合并排名'].rank, p2['合并排名'].total)}）；在零钱通上线35只中排名<strong>第${p2['零钱通排名'].rank}位</strong>（${getPercentile(p2['零钱通排名'].rank, p2['零钱通排名'].total)}）。</p>
+            `;
+        }
+
+        // 计算分位
+        function getPercentile(rank, total) {
+            const pct = ((rank / total) * 100).toFixed(1);
+            if (rank <= total / 3) return `前${pct}%`;
+            if (rank >= total * 2 / 3) return `后${(100 - pct).toFixed(1)}%`;
+            return `中${pct}%`;
+        }
+
+        // 更新趋势图
+        function updateTrendChart() {
+            const f1 = dashboardData.funds['180008'];
+            const f2 = dashboardData.funds['001101'];
+            
+            const dates = f1.history.map(h => h.date);
+            const data1 = f1.history.map(h => h.rate);
+            const data2 = f2.history.map(h => h.rate);
+            
+            if (!trendChart) {
+                trendChart = echarts.init(document.getElementById('trendChart'));
+            }
+            
+            trendChart.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                legend: { data: ['银华货币A (180008)', '银华惠添益A (001101)', '0.9%阈值线'], top: 0 },
+                grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+                xAxis: { type: 'category', boundaryGap: false, data: dates, axisLabel: { rotate: 45 } },
+                yAxis: { 
+                    type: 'value', 
+                    name: '七日年化收益率(%)', 
+                    min: 0.700, 
+                    max: 1.200,
+                    axisLabel: { formatter: '{value}%' }
+                },
+                series: [
+                    {
+                        name: '银华货币A (180008)',
+                        type: 'line',
+                        data: data1,
+                        smooth: true,
+                        lineStyle: { color: '#e74c3c', width: 2 },
+                        itemStyle: { color: '#e74c3c' },
+                        areaStyle: { color: 'rgba(231, 76, 60, 0.1)' },
+                        markPoint: {
+                            data: [
+                                { type: 'max', name: '最高', itemStyle: { color: '#2ecc71' } },
+                                { type: 'min', name: '最低', itemStyle: { color: '#e74c3c' } }
+                            ]
+                        }
+                    },
+                    {
+                        name: '银华惠添益A (001101)',
+                        type: 'line',
+                        data: data2,
+                        smooth: true,
+                        lineStyle: { color: '#27ae60', width: 2 },
+                        itemStyle: { color: '#27ae60' },
+                        areaStyle: { color: 'rgba(39, 174, 96, 0.1)' },
+                        markPoint: {
+                            data: [
+                                { type: 'max', name: '最高', itemStyle: { color: '#2ecc71' } },
+                                { type: 'min', name: '最低', itemStyle: { color: '#e74c3c' } }
+                            ]
+                        }
+                    },
+                    {
+                        name: '0.9%阈值线',
+                        type: 'line',
+                        data: dates.map(() => 0.900),
+                        lineStyle: { color: '#f39c12', type: 'dashed', width: 2 },
+                        itemStyle: { color: '#f39c12' },
+                        symbol: 'none',
+                        markArea: {
+                            silent: true,
+                            data: [[{
+                                yAxis: 0.7,
+                                itemStyle: { color: 'rgba(231, 76, 60, 0.05)' }
+                            }, {
+                                yAxis: 0.9
+                            }]]
+                        }
+                    }
+                ]
+            });
+        }
+
+        // 更新排名分布图
+        function updateRankChart() {
+            const r1 = dashboardData.rank_data['银华货币A'];
+            const r2 = dashboardData.rank_data['银华惠添益A'];
+            const avg = dashboardData.rank_data['平均收益'];
+            
+            const distributionData = [];
+            for (let i = 0; i < 85; i++) {
+                const rate = 1.484 - (i / 85) * (1.484 - 0.698);
+                distributionData.push([parseFloat(rate.toFixed(3)), i + 1]);
+            }
+            
+            if (!rankChart) {
+                rankChart = echarts.init(document.getElementById('rankChart'));
+            }
+            
+            rankChart.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+                xAxis: { 
+                    type: 'value', 
+                    name: '七日年化收益率(%)', 
+                    min: 0.6, 
+                    max: 1.6,
+                    axisLabel: { formatter: '{value}%' }
+                },
+                yAxis: { 
+                    type: 'value', 
+                    name: '排名',
+                    inverse: true,
+                    min: 1,
+                    max: 85
+                },
+                series: [
+                    {
+                        name: '余额宝/零钱通上线基金分布',
+                        type: 'scatter',
+                        data: distributionData,
+                        symbolSize: 8,
+                        itemStyle: { color: 'rgba(45, 90, 135, 0.6)' }
+                    },
+                    {
+                        name: `银华货币A (${r1['合并排名'].rate.toFixed(3)}%)`,
+                        type: 'scatter',
+                        data: [[r1['合并排名'].rate, r1['合并排名'].rank]],
+                        symbolSize: 20,
+                        itemStyle: { color: '#e74c3c', borderColor: '#fff', borderWidth: 2 },
+                        label: { show: true, formatter: `银华货币A\n第${r1['合并排名'].rank}名`, position: 'right', color: '#e74c3c', fontWeight: 'bold' }
+                    },
+                    {
+                        name: `银华惠添益A (${r2['合并排名'].rate.toFixed(3)}%)`,
+                        type: 'scatter',
+                        data: [[r2['合并排名'].rate, r2['合并排名'].rank]],
+                        symbolSize: 20,
+                        itemStyle: { color: '#27ae60', borderColor: '#fff', borderWidth: 2 },
+                        label: { show: true, formatter: `银华惠添益A\n第${r2['合并排名'].rank}名(零钱通)`, position: 'right', color: '#27ae60', fontWeight: 'bold' }
+                    },
+                    {
+                        name: '余额宝均值',
+                        type: 'line',
+                        data: [[avg['余额宝'], 1], [avg['余额宝'], 85]],
+                        lineStyle: { color: '#f39c12', type: 'dashed', width: 2 },
+                        symbol: 'none',
+                        label: { show: true, formatter: `余额宝均值${avg['余额宝'].toFixed(3)}%`, position: 'end', color: '#f39c12' }
+                    },
+                    {
+                        name: '零钱通均值',
+                        type: 'line',
+                        data: [[avg['零钱通'], 1], [avg['零钱通'], 85]],
+                        lineStyle: { color: '#1976d2', type: 'dashed', width: 2 },
+                        symbol: 'none',
+                        label: { show: true, formatter: `零钱通均值${avg['零钱通'].toFixed(3)}%`, position: 'end', color: '#1976d2' }
+                    }
+                ]
+            });
+        }
+
+        // 更新费前排名图
+        function updatePreFeeRankChart() {
+            const p1 = dashboardData.pre_fee_rank_data['银华货币A'];
+            const p2 = dashboardData.pre_fee_rank_data['银华惠添益A'];
+            const avg = dashboardData.pre_fee_rank_data['平均收益'];
+            
+            const distributionData = [];
+            for (let i = 0; i < 85; i++) {
+                const rate = 1.710 - (i / 85) * (1.710 - 1.250);
+                distributionData.push([parseFloat(rate.toFixed(3)), i + 1]);
+            }
+            
+            if (!preFeeRankChart) {
+                preFeeRankChart = echarts.init(document.getElementById('preFeeRankChart'));
+            }
+            
+            preFeeRankChart.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+                grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+                xAxis: { 
+                    type: 'value', 
+                    name: '费前七日年化收益率(%)', 
+                    min: 1.1, 
+                    max: 1.8,
+                    axisLabel: { formatter: '{value}%' }
+                },
+                yAxis: { 
+                    type: 'value', 
+                    name: '排名',
+                    inverse: true,
+                    min: 1,
+                    max: 85
+                },
+                series: [
+                    {
+                        name: '余额宝/零钱通上线基金分布',
+                        type: 'scatter',
+                        data: distributionData,
+                        symbolSize: 8,
+                        itemStyle: { color: 'rgba(45, 90, 135, 0.6)' }
+                    },
+                    {
+                        name: `银华货币A (${p1['合并排名'].rate.toFixed(3)}%)`,
+                        type: 'scatter',
+                        data: [[p1['合并排名'].rate, p1['合并排名'].rank]],
+                        symbolSize: 20,
+                        itemStyle: { color: '#e74c3c', borderColor: '#fff', borderWidth: 2 },
+                        label: { show: true, formatter: `银华货币A\n第${p1['合并排名'].rank}名`, position: 'right', color: '#e74c3c', fontWeight: 'bold' }
+                    },
+                    {
+                        name: `银华惠添益A (${p2['合并排名'].rate.toFixed(3)}%)`,
+                        type: 'scatter',
+                        data: [[p2['合并排名'].rate, p2['合并排名'].rank]],
+                        symbolSize: 20,
+                        itemStyle: { color: '#27ae60', borderColor: '#fff', borderWidth: 2 },
+                        label: { show: true, formatter: `银华惠添益A\n第${p2['合并排名'].rank}名(零钱通)`, position: 'right', color: '#27ae60', fontWeight: 'bold' }
+                    },
+                    {
+                        name: '余额宝费前均值',
+                        type: 'line',
+                        data: [[avg['余额宝'], 1], [avg['余额宝'], 85]],
+                        lineStyle: { color: '#f39c12', type: 'dashed', width: 2 },
+                        symbol: 'none',
+                        label: { show: true, formatter: `余额宝均值${avg['余额宝'].toFixed(3)}%`, position: 'end', color: '#f39c12' }
+                    },
+                    {
+                        name: '零钱通费前均值',
+                        type: 'line',
+                        data: [[avg['零钱通'], 1], [avg['零钱通'], 85]],
+                        lineStyle: { color: '#1976d2', type: 'dashed', width: 2 },
+                        symbol: 'none',
+                        label: { show: true, formatter: `零钱通均值${avg['零钱通'].toFixed(3)}%`, position: 'end', color: '#1976d2' }
+                    }
+                ]
+            });
+        }
+
+        // 初始化
+        window.addEventListener('load', () => {
+            loadData();
+        });
+
+        window.addEventListener('resize', () => {
+            if (trendChart) trendChart.resize();
+            if (rankChart) rankChart.resize();
+            if (preFeeRankChart) preFeeRankChart.resize();
+        });
+    </script>
+</body>
+</html>
