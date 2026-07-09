@@ -267,7 +267,7 @@
         // 从后端加载数据
         async function loadData() {
             try {
-                const response = await fetch('/data_store.json');
+                const response = await fetch('./data_store.json');
                 if (!response.ok) throw new Error('加载数据失败');
                 dashboardData = await response.json();
                 updateDashboard();
