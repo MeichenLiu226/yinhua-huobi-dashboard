@@ -248,14 +248,14 @@
     ],
     "rankings": {
       "180008": {
-        "rank_85": 62,
-        "rank_yeb": 31,
+        "rank_85": 60,
+        "rank_yeb": 30,
         "static_return": 0.8481,
         "wfsy": 0.4647
       },
       "001101": {
-        "rank_85": 61,
-        "rank_lqt": 31,
+        "rank_85": 59,
+        "rank_lqt": 30,
         "static_return": 0.8483,
         "wfsy": 0.4648
       }
