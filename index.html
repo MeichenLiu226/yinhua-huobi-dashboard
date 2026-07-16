@@ -509,30 +509,30 @@
                 <div class="stat-item danger">
                     <div class="stat-label">银华货币A 余额宝排名（50只）</div>
                     <div class="stat-value danger">${r1.rank_yeb} / 50</div>
-                    <div class="stat-desc">${getPercentile(r1.rank_yeb, 50)}（静态收益${r1.static_return.toFixed(3)}%）</div>
+                    <div class="stat-desc">${getPercentile(r1.rank_yeb, 50)}（静态收益${r1.static_return.toFixed(4)}%）</div>
                 </div>
                 <div class="stat-item danger">
                     <div class="stat-label">银华货币A 合并排名（85只）</div>
                     <div class="stat-value danger">${r1.rank_85} / 85</div>
-                    <div class="stat-desc">${getPercentile(r1.rank_85, 85)}（静态收益${r1.static_return.toFixed(3)}%）</div>
+                    <div class="stat-desc">${getPercentile(r1.rank_85, 85)}（静态收益${r1.static_return.toFixed(4)}%）</div>
                 </div>
                 <div class="stat-item warning">
                     <div class="stat-label">银华惠添益A 零钱通排名（35只）</div>
                     <div class="stat-value warning">${r2.rank_lqt} / 35</div>
-                    <div class="stat-desc">${getPercentile(r2.rank_lqt, 35)}（静态收益${r2.static_return.toFixed(3)}%）</div>
+                    <div class="stat-desc">${getPercentile(r2.rank_lqt, 35)}（静态收益${r2.static_return.toFixed(4)}%）</div>
                 </div>
                 <div class="stat-item warning">
                     <div class="stat-label">银华惠添益A 合并排名（85只）</div>
                     <div class="stat-value warning">${r2.rank_85} / 85</div>
-                    <div class="stat-desc">${getPercentile(r2.rank_85, 85)}（静态收益${r2.static_return.toFixed(3)}%）</div>
+                    <div class="stat-desc">${getPercentile(r2.rank_85, 85)}（静态收益${r2.static_return.toFixed(4)}%）</div>
                 </div>
             `;
             document.getElementById('section4Stats').innerHTML = html;
             
             document.getElementById('section4Summary').innerHTML = `
                 <p><strong>计算公式：</strong>周末对客静态收益率 = [周日万份收益 × 365 ÷ (2 × 100)]%</p>
-                <p><strong>银华货币A (180008)：</strong>最近周日（${ws.latest_sunday}）万份收益${r1.wfsy}，静态收益<strong>${r1.static_return.toFixed(3)}%</strong>。在余额宝50只中排名<strong>第${r1.rank_yeb}位</strong>，在85只合并池中排名<strong>第${r1.rank_85}位</strong>。</p>
-                <p><strong>银华惠添益A (001101)：</strong>最近周日万份收益${r2.wfsy}，静态收益<strong>${r2.static_return.toFixed(3)}%</strong>。在零钱通上线35只中排名<strong>第${r2.rank_lqt}位</strong>，在85只合并池中排名<strong>第${r2.rank_85}位</strong>。</p>
+                <p><strong>银华货币A (180008)：</strong>最近周日（${ws.latest_sunday}）万份收益${r1.wfsy}，静态收益<strong>${r1.static_return.toFixed(4)}%</strong>。在余额宝50只中排名<strong>第${r1.rank_yeb}位</strong>，在85只合并池中排名<strong>第${r1.rank_85}位</strong>。</p>
+                <p><strong>银华惠添益A (001101)：</strong>最近周日万份收益${r2.wfsy}，静态收益<strong>${r2.static_return.toFixed(4)}%</strong>。在零钱通上线35只中排名<strong>第${r2.rank_lqt}位</strong>，在85只合并池中排名<strong>第${r2.rank_85}位</strong>。</p>
             `;
         }
 
@@ -830,37 +830,43 @@
                     formatter: function(params) {
                         let result = params[0].axisValue + '<br/>';
                         params.forEach(function(item) {
-                            result += item.marker + item.seriesName + ': ' + Number(item.value).toFixed(3) + '%<br/>';
+                            result += item.marker + item.seriesName + ': ' + Number(item.value).toFixed(4) + '%<br/>';
                         });
                         return result;
                     }
                 },
                 legend: { data: ['银华货币A (180008)', '银华惠添益A (001101)'], top: 0 },
                 grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
-                xAxis: { type: 'category', data: dates, axisLabel: { rotate: 0 } },
+                xAxis: { type: 'category', boundaryGap: false, data: dates, axisLabel: { rotate: 0 } },
                 yAxis: { 
                     type: 'value', 
                     name: '静态收益率(%)',
                     min: 0.7,
                     max: 1.5,
-                    axisLabel: { formatter: function(value) { return value.toFixed(3) + '%'; } }
+                    axisLabel: { formatter: function(value) { return value.toFixed(4) + '%'; } }
                 },
                 series: [
                     {
                         name: '银华货币A (180008)',
-                        type: 'bar',
+                        type: 'line',
                         data: data1,
-                        barWidth: '25%',
+                        smooth: true,
+                        lineStyle: { color: '#e74c3c', width: 2 },
                         itemStyle: { color: '#e74c3c' },
-                        label: { show: true, position: 'top', formatter: function(p) { return Number(p.value).toFixed(3) + '%'; }, color: '#e74c3c', fontWeight: 'bold', fontSize: 11 }
+                        symbol: 'circle',
+                        symbolSize: 8,
+                        label: { show: true, position: 'top', formatter: function(p) { return Number(p.value).toFixed(4) + '%'; }, color: '#e74c3c', fontWeight: 'bold', fontSize: 11 }
                     },
                     {
                         name: '银华惠添益A (001101)',
-                        type: 'bar',
+                        type: 'line',
                         data: data2,
-                        barWidth: '25%',
+                        smooth: true,
+                        lineStyle: { color: '#27ae60', width: 2 },
                         itemStyle: { color: '#27ae60' },
-                        label: { show: true, position: 'top', formatter: function(p) { return Number(p.value).toFixed(3) + '%'; }, color: '#27ae60', fontWeight: 'bold', fontSize: 11 }
+                        symbol: 'circle',
+                        symbolSize: 8,
+                        label: { show: true, position: 'top', formatter: function(p) { return Number(p.value).toFixed(4) + '%'; }, color: '#27ae60', fontWeight: 'bold', fontSize: 11 }
                     }
                 ]
             });
