@@ -233,6 +233,20 @@
                 <!-- 动态填充 -->
             </div>
         </div>
+
+        <!-- 板块4：周末对客静态收益排名 -->
+        <div class="card">
+            <div class="card-title">
+                <span>板块4：周末对客静态收益排名<span class="tag" id="section4Tag">周末静态收益</span></span>
+            </div>
+            <div class="stats-grid" id="section4Stats">
+                <!-- 动态填充 -->
+            </div>
+            <div id="weekendChart" class="chart-container" style="height: 360px;"></div>
+            <div class="summary-box" id="section4Summary">
+                <!-- 动态填充 -->
+            </div>
+        </div>
     </div>
 
     <script>
@@ -241,6 +255,7 @@
         let trendChart = null;
         let rankChart = null;
         let preFeeRankChart = null;
+        let weekendChart = null;
 
         // 显示Toast消息
         function showToast(message, type = 'success') {
@@ -316,11 +331,13 @@
             updateSection1();
             updateSection2();
             updateSection3();
+            updateSection4();
             
             // 更新图表
             updateTrendChart();
             updateRankChart();
             updatePreFeeRankChart();
+            updateWeekendChart();
         }
 
         // 板块1：趋势统计卡片
@@ -477,6 +494,46 @@
             if (rank <= total / 3) return `前${pct}%`;
             if (rank >= total * 2 / 3) return `后${(100 - pct).toFixed(1)}%`;
             return `中${pct}%`;
+        }
+
+        // 板块4：周末对客静态收益排名
+        function updateSection4() {
+            const ws = dashboardData.weekend_static_return;
+            if (!ws) return;
+            const r1 = ws.rankings['180008'];
+            const r2 = ws.rankings['001101'];
+            
+            document.getElementById('section4Tag').textContent = '最近周日 ' + ws.latest_sunday;
+            
+            const html = `
+                <div class="stat-item danger">
+                    <div class="stat-label">银华货币A 余额宝排名（50只）</div>
+                    <div class="stat-value danger">${r1.rank_yeb} / 50</div>
+                    <div class="stat-desc">${getPercentile(r1.rank_yeb, 50)}（静态收益${r1.static_return.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item danger">
+                    <div class="stat-label">银华货币A 合并排名（85只）</div>
+                    <div class="stat-value danger">${r1.rank_85} / 85</div>
+                    <div class="stat-desc">${getPercentile(r1.rank_85, 85)}（静态收益${r1.static_return.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item warning">
+                    <div class="stat-label">银华惠添益A 零钱通排名（35只）</div>
+                    <div class="stat-value warning">${r2.rank_lqt} / 35</div>
+                    <div class="stat-desc">${getPercentile(r2.rank_lqt, 35)}（静态收益${r2.static_return.toFixed(3)}%）</div>
+                </div>
+                <div class="stat-item warning">
+                    <div class="stat-label">银华惠添益A 合并排名（85只）</div>
+                    <div class="stat-value warning">${r2.rank_85} / 85</div>
+                    <div class="stat-desc">${getPercentile(r2.rank_85, 85)}（静态收益${r2.static_return.toFixed(3)}%）</div>
+                </div>
+            `;
+            document.getElementById('section4Stats').innerHTML = html;
+            
+            document.getElementById('section4Summary').innerHTML = `
+                <p><strong>计算公式：</strong>周末对客静态收益率 = [周日万份收益 × 365 ÷ (2 × 100)]%</p>
+                <p><strong>银华货币A (180008)：</strong>最近周日（${ws.latest_sunday}）万份收益${r1.wfsy}，静态收益<strong>${r1.static_return.toFixed(3)}%</strong>。在余额宝50只中排名<strong>第${r1.rank_yeb}位</strong>，在85只合并池中排名<strong>第${r1.rank_85}位</strong>。</p>
+                <p><strong>银华惠添益A (001101)：</strong>最近周日万份收益${r2.wfsy}，静态收益<strong>${r2.static_return.toFixed(3)}%</strong>。在零钱通上线35只中排名<strong>第${r2.rank_lqt}位</strong>，在85只合并池中排名<strong>第${r2.rank_85}位</strong>。</p>
+            `;
         }
 
         // 更新趋势图
@@ -750,6 +807,65 @@
             });
         }
 
+        // 更新周末静态收益走势图
+        function updateWeekendChart() {
+            const ws = dashboardData.weekend_static_return;
+            if (!ws) return;
+            // Reverse to show oldest -> newest
+            const trend1 = ws.trend['180008'].slice().reverse();
+            const trend2 = ws.trend['001101'].slice().reverse();
+            
+            const dates = trend1.map(t => t.date);
+            const data1 = trend1.map(t => t.static_return);
+            const data2 = trend2.map(t => t.static_return);
+            
+            if (!weekendChart) {
+                weekendChart = echarts.init(document.getElementById('weekendChart'));
+            }
+            
+            weekendChart.setOption({
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'cross' },
+                    formatter: function(params) {
+                        let result = params[0].axisValue + '<br/>';
+                        params.forEach(function(item) {
+                            result += item.marker + item.seriesName + ': ' + Number(item.value).toFixed(3) + '%<br/>';
+                        });
+                        return result;
+                    }
+                },
+                legend: { data: ['银华货币A (180008)', '银华惠添益A (001101)'], top: 0 },
+                grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
+                xAxis: { type: 'category', data: dates, axisLabel: { rotate: 0 } },
+                yAxis: { 
+                    type: 'value', 
+                    name: '静态收益率(%)',
+                    min: 0.7,
+                    max: 1.5,
+                    axisLabel: { formatter: function(value) { return value.toFixed(3) + '%'; } }
+                },
+                series: [
+                    {
+                        name: '银华货币A (180008)',
+                        type: 'bar',
+                        data: data1,
+                        barWidth: '25%',
+                        itemStyle: { color: '#e74c3c' },
+                        label: { show: true, position: 'top', formatter: function(p) { return Number(p.value).toFixed(3) + '%'; }, color: '#e74c3c', fontWeight: 'bold', fontSize: 11 }
+                    },
+                    {
+                        name: '银华惠添益A (001101)',
+                        type: 'bar',
+                        data: data2,
+                        barWidth: '25%',
+                        itemStyle: { color: '#27ae60' },
+                        label: { show: true, position: 'top', formatter: function(p) { return Number(p.value).toFixed(3) + '%'; }, color: '#27ae60', fontWeight: 'bold', fontSize: 11 }
+                    }
+                ]
+            });
+        }
+
         // 初始化
         window.addEventListener('load', () => {
             loadData();
@@ -759,6 +875,7 @@
             if (trendChart) trendChart.resize();
             if (rankChart) rankChart.resize();
             if (preFeeRankChart) preFeeRankChart.resize();
+            if (weekendChart) weekendChart.resize();
         });
     </script>
 </body>
